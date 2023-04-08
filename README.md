@@ -21,6 +21,6 @@ To use different Chebyshev variants on each interval, different functions must b
 ```
 bands = [-3.2 -2.2; 0.1 1.1; 2.0 3.0; 3.5 4.0]
 typemat = [1 2 3 4]
-(a,b) = get_coeffs_mixed(bands,5),typemat #computes coefficients a₅,b₅
+(a,b) = get_coeffs_mixed(bands,5,typemat) #computes coefficients a₅,b₅
 (avec,bvec) = get_n_coeffs_mixed(bands,5,typemat) #computes coefficients a₀,…,a₅,b₀,…,b₅
 ```
