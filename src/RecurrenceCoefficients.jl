@@ -6,7 +6,7 @@ import Base: diff, *
 include("CauchyInts.jl")
 include("AuxiliaryFunctions.jl")
 
-export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int
+export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int, pre_comp, pre_compU, pre_compV, pre_compW, get_coeffs_post, get_n_coeffs_post
 
 #Chebyshev T
 function pre_comp(h, bands, nmat)
@@ -1400,6 +1400,40 @@ function get_n_coeffs_mixed(bands,n,typemat,h::Function=j->(x->1);nmat=nothing)
 
     pre_comp_mixed(h, bands, nmat, typemat)
 
+    Y₁ = main_comp(bands,nmat,0)
+    avec = zeros(n+1); bvec = zeros(n+1)
+    for j = 0:n
+        Y₁₊ = main_comp(bands,nmat,j+1)
+        a = Y₁[1,1]-Y₁₊[1,1]-g₁
+        b = √(Y₁₊[1,2]*Y₁₊[2,1])
+        if abs(imag(a))>1e-12 || abs(imag(b))>1e-12
+            println("Warning: computed coefficient non-real. Imaginary parts printed")
+            println(imag(a))
+            println(imag(b))
+        end
+        avec[j+1] = real(a)
+        bvec[j+1] = real(b)
+        Y₁ = Y₁₊
+    end
+    (avec,bvec)
+end
+
+function get_coeffs_post(bands,n,nmat)
+    Y₁ = main_comp(bands,nmat,n)
+    Y₁₊ = main_comp(bands,nmat,n+1)
+    a = Y₁[1,1]-Y₁₊[1,1]-g₁
+    b = √(Y₁₊[1,2]*Y₁₊[2,1])
+    if abs(imag(a))>1e-12 || abs(imag(b))>1e-12
+        println("Warning: computed coefficient non-real. Imaginary parts printed")
+        println(imag(a))
+        println(imag(b))
+    end
+    a = real(a)
+    b = real(b)
+    (a,b)
+end
+
+function get_n_coeffs_post(bands,n,nmat)
     Y₁ = main_comp(bands,nmat,0)
     avec = zeros(n+1); bvec = zeros(n+1)
     for j = 0:n
