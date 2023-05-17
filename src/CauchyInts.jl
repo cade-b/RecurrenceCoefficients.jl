@@ -146,3 +146,8 @@ end
 function CauchyMat(Y,n,c,r;flag=0)
     CauchyMat((Y.-c)/r,n;flag=flag)
 end
+
+function CauchyEval(z,c,r,coeffs;flag=0)
+    A = CauchyMat(z,length(coeffs),c,r;flag=flag)
+    A*coeffs
+end

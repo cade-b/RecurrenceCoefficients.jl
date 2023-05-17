@@ -153,6 +153,17 @@ function compute_g(z,bands,hvec,g_a,int_vals)
     g_val -= g_a
 end
 
+struct gfunction
+    bands
+    hvec
+    g_a
+    int_vals
+end
+
+function (g::gfunction)(z)
+    compute_g(z,g.bands,g.hvec,g.g_a,g.int_vals)
+end
+
 function correct_g(bands,hvec,g_a,int_vals)
     logcap, g₁ = 0,0
     g = size(bands,1)-1
@@ -246,8 +257,28 @@ function compute_h_pre(z,bands,int_vals,gap_vals)
    # svde
 end
 
+struct hfunction_pre
+    bands
+    int_vals
+    gap_vals
+end
+
+function (h_pre::hfunction_pre)(z)
+    compute_h_pre(z,h_pre.bands,h_pre.int_vals,h_pre.gap_vals)
+end
+
 function compute_h_post(h_vals,Avec,Δ,n)
     sum(diag(h_vals*[Avec [log.(exp.(n*Δ)); 0]]))  
+end
+
+struct hfunction_post
+    Avec
+    Δ
+    n
+end
+
+function (h_post::hfunction_post)(z)
+    compute_h_post(z,h_post.Avec,h_post.Δ,h_post.n)
 end
 
 function correct_h_pre(bands,int_vals,gap_vals)

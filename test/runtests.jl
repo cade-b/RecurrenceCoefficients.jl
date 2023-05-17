@@ -17,4 +17,8 @@ using Test
     (a2,b2) = get_n_coeffs_post(bands,50,nmat)
     @test maximum(abs.(a1-a2)) == 0.
     @test maximum(abs.(b1-b2)) == 0.
+
+    bands = [-4.5 -3.0; -2.0 -1.0; 2.0 3.0]
+    (avec,bvec,ints)=get_n_coeffs_and_ints(bands,50,0.0)
+    @test ints[4]≈0.05126582226964149im
 end
