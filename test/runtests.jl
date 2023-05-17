@@ -21,4 +21,10 @@ using Test
     bands = [-4.5 -3.0; -2.0 -1.0; 2.0 3.0]
     (avec,bvec,ints)=get_n_coeffs_and_ints(bands,50,0.0)
     @test ints[4]≈0.05126582226964149im
+
+    bands = [-3.3 -2.0; -1.0 0.0; 2.0 3.0];
+    (avect,bvect) = get_n_coeffs_mixed(bands,50,special_type(bands),get_special_h(bands))
+    (avecn,bvecn) = get_n_coeffs_no_circ(bands,50)
+    @test maximum(abs.(avect.-avecn))<tol
+    @test maximum(abs.(bvect.-bvecn))<tol
 end

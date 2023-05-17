@@ -6,7 +6,7 @@ import Base: diff, *
 include("CauchyInts.jl")
 include("AuxiliaryFunctions.jl")
 
-export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int, pre_comp, pre_compU, pre_compV, pre_compW, get_coeffs_post, get_n_coeffs_post, get_n_coeffs_and_ints
+export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int, pre_comp, pre_compU, pre_compV, pre_compW, get_coeffs_post, get_n_coeffs_post, get_n_coeffs_and_ints, get_n_coeffs_no_circ, get_special_h, special_type
 
 #Chebyshev T
 function pre_comp(h, bands, nmat)
@@ -1531,6 +1531,255 @@ function get_n_coeffs_and_ints(bands,n,eval_points,kind::String="T",h::Function=
         Y₁ = Y₁₊
     end
     (avec,bvec,ints)
+end
+
+function get_special_h(bands)
+    function special_h(j)
+        if j == size(bands,1)
+            return x -> -R(bands[1:end-1,1])(x)/R(bands[1:end-1,2])(x)
+        else
+            out_points = bands[1:end .!= j,:]
+            return x -> (x-bands[end,2])*R(out_points[:,1])(x)/R(out_points[:,2])(x)
+        end
+    end
+    special_h
+end
+
+function special_type(bands)
+    typemat = 3*ones(size(bands,1)) .|> Int128
+    typemat[end] = 2
+    typemat
+end
+
+### functions that throw away the circles ###
+#performs computation without circles; use h=special_h and typemat = special_type(bands) for accurate results
+function pre_comp_mixed_no_circ(h, bands, nmat, typemat)
+    # get all necessary ApproxFun coefficients at once
+    int_vals = cheby_int(bands)
+    gap_vals = cheby_gap(bands)
+
+    hvec = g_coeffs(bands, gap_vals)
+    g_a = compute_g_left(bands,hvec,int_vals)
+    
+    function w(j)
+        if typemat[j] == 1 #T
+            return z -> h(j)(z)/(√(bands[j,2]-z |> Complex)*√(z-bands[j,1] |> Complex))
+        elseif typemat[j] == 2 #U
+            return z -> h(j)(z)*(√(bands[j,2]-z |> Complex)*√(z-bands[j,1] |> Complex))
+        elseif typemat[j] == 3 #V
+            return z -> h(j)(z)*(√(z-bands[j,1] |> Complex)/√(bands[j,2]-z |> Complex))
+        else #W
+            return z -> h(j)(z)*(√(bands[j,2]-z |> Complex)/√(z-bands[j,1] |> Complex))
+        end
+    end
+    
+    global g = size(bands,1)-1
+    global Δ = zeros(ComplexF64,g)
+    for i = 1:g
+        Δ[i]=compute_g((bands[i,2]+bands[i+1,1])/2+eps()im,bands,hvec,g_a,int_vals)-compute_g((bands[i,2]+bands[i+1,1])/2-eps()im,bands,hvec,g_a,int_vals)
+    end
+
+    global (cap,g₁)=correct_g(bands,hvec,g_a,int_vals)
+
+    gridmat = Array{Array{ComplexF64,1}}(undef,g+1)
+    for j = 1:g+1
+        gridmat[j] = M(bands[j,1],bands[j,2]).(Ugrid(nmat[j])) .|> Complex
+    end
+
+    ChebyAmat = Array{ChebyParams}(undef,g+1)
+    ChebyBmat = Array{ChebyParams}(undef,g+1)
+    for j = 1:g+1
+        ChebyAmat[j] = buildCheby(bands[j,1],bands[j,2],typemat[j]) 
+        ChebyBmat[j] = buildCheby(bands[j,1],bands[j,2],typemat[j]+2*(typemat[j]%2)-1) 
+    end
+
+    global ntot = sum(nmat)
+    nptot(j) = sum(nmat[1:j])
+    
+    #build the portions of the matrix blocks not affected by the degree
+
+    #build top left corner
+    global A₁₁ = zeros(ComplexF64,ntot,ntot); global rhs₁₁=zeros(ComplexF64,ntot,1)
+    for j = 1:g+1
+        CM₊ = zeros(ComplexF64,nmat[j],ntot)
+        #CM₋ = zeros(ComplexF64,nmat[j],ntot)
+        CM₂₊= CauchyInterval(gridmat[j],ChebyBmat[j],nmat[j]-1;flag=1)
+        #CM₂₋= CauchyInterval(gridmat[j],ChebyBmat[j],nmat[j,2]-1;flag=-1)
+        CM₊[:,nptot(j-1)+1:nptot(j)]= CM₂₊
+        #CM₋[:,nptot(j-1)+1:nptot(j)]= CM₂₋
+        for k=(1:g+1)[1:end .!= j,:]
+            CM₂ = CauchyInterval(gridmat[j],ChebyBmat[k],nmat[k]-1)
+            CM₊[:,nptot(k-1)+1:nptot(k)]=CM₂
+            #CM₋[:,nptot(k-1)+1:nptot(k)]=CM₂
+        end
+        #println(maximum(abs.(CM₊-CM₋)))
+        gn₂ = zeros(nmat[j])
+        A₂ = CM₊#-Diagonal(gn₂)*CM₋
+        #global testguy=A₂
+        #combine and build RHS
+        A₁₁[nptot(j-1)+1:nptot(j),:] = A₂
+        rhs₂ = gn₂.-1
+        rhs₁₁[nptot(j-1)+1:nptot(j)] = rhs₂
+    end
+
+    global A₂₁ = zeros(ComplexF64,ntot,ntot); global rhs₂₁=zeros(ComplexF64,ntot,1)
+    global Cmats2 = Array{Matrix{ComplexF64}}(undef,g+1)
+    for j = 1:g+1
+        CM₋ = zeros(ComplexF64,nmat[j],ntot)
+        CM₂₋= CauchyInterval(gridmat[j],ChebyAmat[j],nmat[j]-1;flag=-1)
+        CM₋[:,nptot(j-1)+1:nptot(j)]= CM₂₋
+        for k=(1:g+1)[1:end .!= j,:]
+            CM₂ = CauchyInterval(gridmat[j],ChebyAmat[k],nmat[k]-1)
+            CM₋[:,nptot(k-1)+1:nptot(k)]=CM₂
+        end
+        Cmats2[j] = CM₋
+    end
+
+    #build bottom left corner
+    global A₁₂ = zeros(ComplexF64,ntot,ntot); global rhs₁₂=zeros(ComplexF64,ntot,1)
+    global Cmats3 = Array{Matrix{ComplexF64}}(undef,g+1)
+    for j = 1:g+1
+        CM₋ = zeros(ComplexF64,nmat[j],ntot)
+        CM₂₋ = CauchyInterval(gridmat[j],ChebyBmat[j],nmat[j]-1;flag=-1)
+        CM₋[:,nptot(j-1)+1:nptot(j)]= CM₂₋
+        for k=(1:g+1)[1:end .!= j,:]
+            CM₂ = CauchyInterval(gridmat[j],ChebyBmat[k],nmat[k]-1)
+            CM₋[:,nptot(k-1)+1:nptot(k)]= CM₂
+        end
+        Cmats3[j] = CM₋
+    end
+
+    #build bottom right corner
+    global A₂₂ = zeros(ComplexF64,ntot,ntot); global rhs₂₂=zeros(ComplexF64,ntot,1)
+    for j = 1:g+1
+        CM₊ = zeros(ComplexF64,nmat[j],ntot)
+        CM₋ = zeros(ComplexF64,nmat[j],ntot)
+        CM₂₊ = CauchyInterval(gridmat[j],ChebyAmat[j],nmat[j]-1;flag=1)
+        #CM₂₋ = CauchyInterval(gridmat[j],ChebyAmat[j],nmat[j]-1;flag=-1)
+        CM₊[:,nptot(j-1)+1:nptot(j)]= CM₂₊
+        #CM₋[:,nptot(j-1)+1:nptot(j)]= CM₂₋
+        for k=(1:g+1)[1:end .!= j,:]
+            CM₂ = CauchyInterval(gridmat[j],ChebyAmat[k],nmat[k]-1)
+            CM₊[:,nptot(k-1)+1:nptot(k)]= CM₂
+            #CM₋[:,nptot(k-1)+1:nptot(k)]= CM₂
+        end
+        gn₂ = zeros(nmat[j])
+        A₂ = CM₊#-Diagonal(gn₂)*CM₋
+        #combine and build RHS
+        A₂₂[nptot(j-1)+1:nptot(j),:] = A₂
+        rhs₂ = gn₂.-1
+        rhs₂₂[nptot(j-1)+1:nptot(j)] = rhs₂
+    end
+    
+    #store values of g(z) on grid points on circles
+    get_g(z) = compute_g(z,bands,hvec,g_a,int_vals)
+    global g_vals = Array{Vector{ComplexF64}}(undef,g+1)
+    #global g₀ = get_g(0)
+    global gstuff = gfunction(bands,hvec,g_a,int_vals)
+    
+    #store values of modified weight function on intervals
+    global w1_vals = Array{Vector{ComplexF64}}(undef,g+1)
+    global w2_vals = Array{Vector{ComplexF64}}(undef,g+1)
+    for j = 1:g+1
+        w1_vals[j] = map(z->w(j)(z), gridmat[j])
+        w2_vals[j] = map(z->-1/w(j)(z), gridmat[j])
+    end
+    
+    #store terms for efficient computation of h(z)
+    global (Ah_pre,Bh_pre) = h_coeffs_pre(bands,int_vals,gap_vals)
+    global hcorr_pre = correct_h_pre(bands,int_vals,gap_vals)
+
+    get_h_pre(z) = compute_h_pre(z, bands, int_vals, gap_vals)
+    #global h₀_pre = get_h_pre(0)
+    global hstuff_pre = hfunction_pre(bands, int_vals, gap_vals)
+end
+
+function main_comp_no_circ(bands,nmat,deg)
+    nptot(j) = sum(nmat[1:j])
+    #perform the remaining computations
+    Avec = h_coeffs_post(Ah_pre, Bh_pre, Δ, deg)
+
+    #global h₀ = compute_h_post(h₀_pre, Avec, Δ, deg)
+    global hstuff_post = hfunction_post(Avec, Δ, deg)
+    
+    jump1_vals = Array{Vector{ComplexF64}}(undef,g+1)
+    jump2_vals = Array{Vector{ComplexF64}}(undef,g+1)
+    for j = 1:g+1
+        jump1_vals[j] = w1_vals[j]*exp(-Avec[j])
+        jump2_vals[j] = w2_vals[j]*exp(Avec[j])
+        
+        #finish top right corner 
+        A₂ = -Diagonal(jump2_vals[j])*Cmats2[j]
+        A₂₁[nptot(j-1)+1:nptot(j),:] = A₂
+        rhs₂₁[nptot(j-1)+1:nptot(j)] = jump2_vals[j]
+        
+        #finish bottom left corner
+        A₂ = -Diagonal(jump1_vals[j])*Cmats3[j]
+        A₁₂[nptot(j-1)+1:nptot(j),:] = A₂
+        rhs₁₂[nptot(j-1)+1:nptot(j)] = jump1_vals[j]
+    end
+    
+    #build system
+    A = [A₁₁ A₂₁; A₁₂ A₂₂]
+    rhs = [rhs₁₁ rhs₂₁; rhs₁₂ rhs₂₂]
+    coeffs = A\rhs
+    #println(cond(A))
+    
+    #sort coefficients
+    coeffmat₁₁ = Array{Array{ComplexF64,1}}(undef,g+1)
+    global coeffmat₁₂ = Array{Array{ComplexF64,1}}(undef,g+1)
+    coeffmat₂₁ = Array{Array{ComplexF64,1}}(undef,g+1)
+    coeffmat₂₂ = Array{Array{ComplexF64,1}}(undef,g+1)
+
+    for j=1:g+1
+        coeffmat₁₁[j] = coeffs[nptot(j-1)+1:nptot(j),1]
+
+        coeffmat₁₂[j] = coeffs[ntot+nptot(j-1)+1:ntot+nptot(j),1]
+
+        coeffmat₂₁[j] = coeffs[nptot(j-1)+1:nptot(j),2]
+
+        coeffmat₂₂[j] = coeffs[ntot+nptot(j-1)+1:ntot+nptot(j),2]
+    end
+    
+    Y₁ = zeros(ComplexF64,2,2)
+    for j = 1:g+1
+        leading_jacobi = [coeffmat₁₁[j][1]*(im/2π) coeffmat₁₂[j][1]*(im/2π) ; coeffmat₂₁[j][1]*(im/2π)  coeffmat₂₂[j][1]*(im/2π)]     
+        Y₁ += leading_jacobi
+    end
+    h_correction = correct_h_post(hcorr_pre, Avec, Δ, deg)
+    QMB = Y₁+h_correction
+end
+
+function get_n_coeffs_no_circ(bands,n,typemat=nothing,h=nothing;nmat=nothing)
+    if typemat == nothing
+        typemat = special_type(bands)
+    end
+
+    if h == nothing
+        h = get_special_h(bands)
+    end
+
+    if nmat == nothing
+        nmat = 20*ones(size(bands,1)) .|> Int128
+    end
+
+    pre_comp_mixed_no_circ(h, bands, nmat, typemat)
+    Y₁ = main_comp_no_circ(bands,nmat,0)
+    avec = zeros(n+1); bvec = zeros(n+1)
+    for j = 0:n
+        Y₁₊ = main_comp_no_circ(bands,nmat,j+1)
+        a = Y₁[1,1]-Y₁₊[1,1]-g₁
+        b = √(Y₁₊[1,2]*Y₁₊[2,1])
+        if abs(imag(a))>1e-12 || abs(imag(b))>1e-12
+            println("Warning: computed coefficient non-real. Imaginary parts printed")
+            println(imag(a))
+            println(imag(b))
+        end
+        avec[j+1] = real(a)
+        bvec[j+1] = real(b)
+        Y₁ = Y₁₊
+    end
+    (avec,bvec)
 end
 
 ### single interval stuff ###
