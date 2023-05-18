@@ -6,7 +6,7 @@ import Base: diff, *
 include("CauchyInts.jl")
 include("AuxiliaryFunctions.jl")
 
-export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int, pre_comp, pre_compU, pre_compV, pre_compW, get_coeffs_post, get_n_coeffs_post, get_n_coeffs_and_ints, get_n_coeffs_no_circ, get_special_h, special_type
+export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int, pre_comp, pre_compU, pre_compV, pre_compW, get_coeffs_post, get_n_coeffs_post, get_n_coeffs_and_ints, get_n_coeffs_and_ints_mixed, get_n_coeffs_no_circ, get_special_h, special_type
 
 #Chebyshev T
 function pre_comp(h, bands, nmat)
@@ -34,7 +34,7 @@ function pre_comp(h, bands, nmat)
         gridmat[j,2] = M(bands[j,1],bands[j,2]).(Ugrid(nmat[j,2])) .|> Complex
     end
 
-    global ChebyTmat = Array{ChebyParams}(undef,g+1)
+    ChebyTmat = Array{ChebyParams}(undef,g+1)
     ChebyUmat = Array{ChebyParams}(undef,g+1)
     for j = 1:g+1
         ChebyUmat[j] = buildCheby(bands[j,1],bands[j,2],2) 
@@ -1099,7 +1099,7 @@ function pre_comp_mixed(h, bands, nmat, typemat)
         gridmat[j,2] = M(bands[j,1],bands[j,2]).(Ugrid(nmat[j,2])) .|> Complex
     end
 
-    ChebyAmat = Array{ChebyParams}(undef,g+1)
+    global ChebyAmat = Array{ChebyParams}(undef,g+1)
     ChebyBmat = Array{ChebyParams}(undef,g+1)
     for j = 1:g+1
         ChebyAmat[j] = buildCheby(bands[j,1],bands[j,2],typemat[j]) 
@@ -1462,6 +1462,20 @@ function get_n_coeffs_post(bands,n,nmat)
 end
 
 function get_n_coeffs_and_ints(bands,n,eval_points,kind::String="T",h::Function=j->(x->1);nmat=nothing)
+    if kind == "T"
+        typemat = ones(size(bands,1)) .|> Int128
+    elseif kind == "U"
+        typemat = 2*ones(size(bands,1)) .|> Int128
+    elseif kind == "V"
+        typemat = 3*ones(size(bands,1)) .|> Int128
+    elseif kind == "W"
+        typemat = 4*ones(size(bands,1)) .|> Int128
+    end
+
+    get_n_coeffs_and_ints_mixed(bands,n,typemat,eval_points,h;nmat)
+end
+
+function get_n_coeffs_and_ints_mixed(bands,n,typemat,eval_points,h::Function=j->(x->1);nmat=nothing)
     if eval_points isa Number 
         eval_points = [eval_points]
     end
@@ -1470,16 +1484,7 @@ function get_n_coeffs_and_ints(bands,n,eval_points,kind::String="T",h::Function=
         nmat = [120*ones(size(bands,1)) 20*ones(size(bands,1))] .|> Int128
     end
 
-    if kind == "T"
-        pre_comp(h, bands, nmat)
-    elseif kind == "U"
-        pre_compU(h, bands, nmat)
-    elseif kind == "V"
-        pre_compV(h, bands, nmat)
-    elseif kind == "W"
-        pre_compW(h, bands, nmat)
-    end
-
+    pre_comp_mixed(h, bands, nmat, typemat)
     Y₁ = main_comp(bands,nmat,0)
     cc(j) = (bands[j,1]+bands[j,2])/2
     rr(j) = 1.25*(bands[j,2]-bands[j,1])/2
@@ -1494,7 +1499,7 @@ function get_n_coeffs_and_ints(bands,n,eval_points,kind::String="T",h::Function=
         S₀ = 0.
         for j = 1:g+1
             int_circ = CauchyEval(z,cc(j),rr(j),coeffmat₁₂[j,1])
-            int_int =  CauchyInterval(z,ChebyTmat[j],nmat[j,2]-1)*coeffmat₁₂[j,2]
+            int_int =  CauchyInterval(z,ChebyAmat[j],nmat[j,2]-1)*coeffmat₁₂[j,2]
             S₀ += int_circ[1]+int_int[1]
         end 
         ints[1,i] = S₀
@@ -1521,7 +1526,7 @@ function get_n_coeffs_and_ints(bands,n,eval_points,kind::String="T",h::Function=
                 S₀ = 0.
                 for j = 1:g+1
                     int_circ = CauchyEval(z,cc(j),rr(j),coeffmat₁₂[j,1])
-                    int_int =  CauchyInterval(z,ChebyTmat[j],nmat[j,2]-1)*coeffmat₁₂[j,2]
+                    int_int =  CauchyInterval(z,ChebyAmat[j],nmat[j,2]-1)*coeffmat₁₂[j,2]
                     S₀ += int_circ[1]+int_int[1]
                 end
                 ints[j+2,i] = constprod*S₀*exp(hz[i]-(j+1)*gz[i])
