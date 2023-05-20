@@ -6,7 +6,7 @@ import Base: diff, *
 include("CauchyInts.jl")
 include("AuxiliaryFunctions.jl")
 
-export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int, pre_comp, pre_compU, pre_compV, pre_compW, get_coeffs_post, get_n_coeffs_post, get_n_coeffs_and_ints, get_n_coeffs_and_ints_mixed, get_n_coeffs_no_circ, get_special_h, special_type
+export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int, pre_comp, pre_compU, pre_compV, pre_compW, get_coeffs_post, get_n_coeffs_post, get_n_coeffs_and_ints, get_n_coeffs_and_ints_mixed, get_n_coeffs_no_circ, get_n_coeffs_and_ints_no_circ, get_special_h, special_type
 
 #Chebyshev T
 function pre_comp(h, bands, nmat)
@@ -1591,7 +1591,7 @@ function pre_comp_mixed_no_circ(h, bands, nmat, typemat)
         gridmat[j] = M(bands[j,1],bands[j,2]).(Ugrid(nmat[j])) .|> Complex
     end
 
-    ChebyAmat = Array{ChebyParams}(undef,g+1)
+    global ChebyAmat = Array{ChebyParams}(undef,g+1)
     ChebyBmat = Array{ChebyParams}(undef,g+1)
     for j = 1:g+1
         ChebyAmat[j] = buildCheby(bands[j,1],bands[j,2],typemat[j]) 
@@ -1785,6 +1785,71 @@ function get_n_coeffs_no_circ(bands,n,typemat=nothing,h=nothing;nmat=nothing)
         Y₁ = Y₁₊
     end
     (avec,bvec)
+end
+
+function get_n_coeffs_and_ints_no_circ(bands, n, eval_points,typemat=nothing,h=nothing;nmat=nothing)
+    if typemat == nothing
+        typemat = special_type(bands)
+    end
+
+    if h == nothing
+        h = get_special_h(bands)
+    end
+
+    if nmat == nothing
+        nmat = 20*ones(size(bands,1)) .|> Int128
+    end
+
+    pre_comp_mixed_no_circ(h, bands, nmat, typemat)
+    Y₁ = main_comp_no_circ(bands,nmat,0)
+    cc(j) = (bands[j,1]+bands[j,2])/2
+    rr(j) = 1.25*(bands[j,2]-bands[j,1])/2
+    
+    avec = zeros(n+1); bvec = zeros(n+1)
+    ints = zeros(ComplexF64, n+1,length(eval_points))
+    
+    gz = gstuff.(eval_points)
+    hz_pre = hstuff_pre.(eval_points)
+    
+    for (i,z) in enumerate(eval_points)
+        S₀ = 0.
+        for j = 1:g+1
+            int_int =  CauchyInterval(z,ChebyAmat[j],nmat[j]-1)*coeffmat₁₂[j]
+            S₀ += int_int[1]
+        end 
+        ints[1,i] = S₀
+    end
+    
+    constprod = 1.
+    
+    for j = 0:n
+        Y₁₊ = main_comp_no_circ(bands,nmat,j+1)
+        a = Y₁[1,1]-Y₁₊[1,1]-g₁
+        b = √(Y₁₊[1,2]*Y₁₊[2,1])
+        if abs(imag(a))>1e-12 || abs(imag(b))>1e-12
+            println("Warning: computed coefficient non-real. Imaginary parts printed")
+            println(imag(a))
+            println(imag(b))
+        end
+        avec[j+1] = real(a)
+        bvec[j+1] = real(b)
+        
+        if j<n
+            hz = hstuff_post.(hz_pre)
+            constprod /= cap*bvec[j+1]
+            for (i,z) in enumerate(eval_points)
+                S₀ = 0.
+                for j = 1:g+1
+                    int_int =  CauchyInterval(z,ChebyAmat[j],nmat[j]-1)*coeffmat₁₂[j]
+                    S₀ += int_int[1]
+                end
+                ints[j+2,i] = constprod*S₀*exp(hz[i]-(j+1)*gz[i])
+            end
+        end
+        
+        Y₁ = Y₁₊
+    end
+    (avec,bvec,ints)
 end
 
 ### single interval stuff ###
