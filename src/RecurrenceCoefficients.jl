@@ -556,7 +556,7 @@ function get_n_coeffs_and_ints_mixed(bands,n,typemat,eval_points,h::Function=j->
         
         Y₁ = Y₁₊
     end
-    (avec,bvec,ints)
+    (avec,bvec,ints,gz)
 end
 
 function get_special_h(bands)
@@ -902,7 +902,7 @@ function get_n_coeffs_and_ints_no_circ(bands, n, eval_points,typemat=nothing,h=n
         
         Y₁ = Y₁₊
     end
-    (avec,bvec,ints)
+    (avec,bvec,ints,gz)
 end
 
 ### single interval stuff ###
