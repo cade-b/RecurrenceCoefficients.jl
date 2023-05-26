@@ -1,7 +1,7 @@
 name = "RecurrenceCoefficients"
 uuid = "de372851-07f4-4192-bc5b-b0c28d817e5e"
 authors = ["Cade Ballew <ballew@uw.edu>"]
-version = "0.2.1"
+version = "0.2.2"
 
 [deps]
 ApproxFun = "28f2ccd6-bb30-5033-b560-165f7b14dc2f"
