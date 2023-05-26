@@ -841,6 +841,10 @@ function get_n_coeffs_no_circ(bands,nstart::Int64,nend::Int64,typemat=nothing,h=
 end
 
 function get_n_coeffs_and_ints_no_circ(bands, n, eval_points,typemat=nothing,h=nothing;nmat=nothing)
+    if eval_points isa Number 
+        eval_points = [eval_points]
+    end
+    
     if typemat == nothing
         typemat = special_type(bands)
     end
