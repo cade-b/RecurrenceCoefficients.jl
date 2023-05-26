@@ -27,4 +27,4 @@ typemat = [1 2 3 4]
 
 
 [![CI](https://github.com/cade-b/RecurrenceCoefficients.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/cade-b/RecurrenceCoefficients.jl/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/Jcade-b/RecurrenceCoefficients.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaApproximation/ApproxFun.jl)
+[![codecov](https://codecov.io/gh/cade-b/RecurrenceCoefficients.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/cade-b/RecurrenceCoefficients.jl)
