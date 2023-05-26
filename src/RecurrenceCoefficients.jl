@@ -562,10 +562,10 @@ end
 function get_special_h(bands)
     function special_h(j)
         if j == size(bands,1)
-            return x -> -R(bands[1:end-1,1])(x)/R(bands[1:end-1,2])(x)
+            return x -> R(bands[1:end-1,1])(x)/R(bands[1:end-1,2])(x)
         else
             out_points = bands[1:end .!= j,:]
-            return x -> (x-bands[end,2])*R(out_points[:,1])(x)/R(out_points[:,2])(x)
+            return x -> (bands[end,2]-x)*R(out_points[:,1])(x)/R(out_points[:,2])(x)
         end
     end
     special_h
