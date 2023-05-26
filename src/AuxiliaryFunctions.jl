@@ -226,7 +226,8 @@ function h_coeffs_post(A,B,Δ,n)
     b = -B*log.(exp.(n*Δ))   
     Avec = A\b
     if norm(imag(Avec))>1e-12
-        println("Warning: computed h coefficients nonreal")
+        println("Warning: computed h coefficients nonreal. Norm of imaginary part printed")
+        norm(imag(Avec))
     end
     Avec = real(Avec)
 end
