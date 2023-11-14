@@ -1,12 +1,13 @@
 module RecurrenceCoefficients
 
-using LinearAlgebra, ApproxFun
+using LinearAlgebra, ApproxFun, Elliptic, Elliptic.Jacobi
 import Base: diff, *
 
 include("CauchyInts.jl")
 include("AuxiliaryFunctions.jl")
+include("AkhiezerFunctions.jl")
 
-export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int, pre_comp, get_coeffs_post, get_n_coeffs_post, get_n_coeffs_and_ints, get_n_coeffs_and_ints_mixed, get_n_coeffs_no_circ, get_n_coeffs_and_ints_no_circ, get_special_h, special_type
+export get_coeffs, get_n_coeffs, get_coeffs_mixed, get_n_coeffs_mixed, get_coeffs1int, get_n_coeffs1int, pre_comp, get_coeffs_post, get_n_coeffs_post, get_n_coeffs_and_ints, get_n_coeffs_and_ints_mixed, get_n_coeffs_no_circ, get_n_coeffs_and_ints_no_circ, get_special_h, special_type, get_coeffs_akh, get_n_coeffs_akh, get_n_coeffs_and_ints_akh
 
 function pre_comp(h, bands, nmat, typemat)
     # get all necessary ApproxFun coefficients at once
@@ -1083,6 +1084,34 @@ function get_n_coeffs1int(h,nstart,nend,a,b; num_points₁=120, num_points₂=20
         Y₁ = Y₁₊
     end
     (avec,bvec)
+end
+
+### Akhiezer polynomials ###
+function get_coeffs_akh(bands,n)
+    avec = get_a(bands,n)
+    bvec = get_b(bands,n)
+    (avec,bvec)
+end
+
+function get_n_coeffs_akh(bands,n)
+    avec = get_a(bands,0:n)
+    bvec = get_b(bands,0:n)
+    (avec,bvec)
+end
+
+function get_n_coeffs_and_ints_akh(bands,n,eval_points)
+    if eval_points isa Number 
+        eval_points = [eval_points]
+    end
+    
+    avec = get_a(bands,0:n)
+    bvec = get_b(bands,0:n)
+    ints = zeros(ComplexF64,n+1,length(eval_points))
+    for k = 0:n
+        ints[k+1,:] = map(x->CIp(bands,k,x),eval_points)
+    end
+    gz = log.(map(z->expg(bands,z),eval_points))
+    (avec,bvec,ints,gz)
 end
 
 end # module

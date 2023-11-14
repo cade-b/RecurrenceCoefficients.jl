@@ -49,4 +49,19 @@ using Test
     @test maximum(abs.(bvect-bvecn))<tol
     @test maximum(abs.(avecn1-avecn[26:end]))<tol
     @test maximum(abs.(bvecn1-bvecn[26:end]))<tol
+
+    #check Akhiezer polynomials
+    bands = [-1.2 -0.5; 0.1 0.75]
+    (aveca,bveca) = get_n_coeffs_akh(bands,51)
+    (avecn,bvecn) = get_n_coeffs_no_circ(bands,50)
+    @test maximum(abs.(aveca[2:end]-avecn))<tol
+    @test maximum(abs.(bveca[2:end]-bvecn))<tol
+
+    z1 = rand()+rand()im
+    z2 = rand()-rand()im
+    z3 = -rand()+rand()im
+    z4 = -rand()-rand()im
+    (~,~,~,gza) = get_n_coeffs_and_ints_akh(bands,0,[z1; z2; z3; z4])
+    (~,~,~,gzn) = get_n_coeffs_and_ints_no_circ(bands,0,[z1; z2; z3; z4])
+    @test maximum(abs.(exp.(gza)-exp.(gzn)))<tol
 end
