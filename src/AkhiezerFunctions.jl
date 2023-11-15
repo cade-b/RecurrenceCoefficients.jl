@@ -22,14 +22,12 @@
 #           Pexton, R. L.
 #             Lawrence Livermore National Laboratory
 #             Livermore, CA  94550
-
+const D1MACH1 = floatmin(Float64)
+const D1MACH2 = floatmax(Float64)
+const D1MACH3 = eps(Float64)/2
+const D1MACH4 = eps(Float64)
+const D1MACH5 = log10(2.)
 function DRF(X::ComplexF64, Y::ComplexF64, Z::Float64)
-    D1MACH1 = floatmin(Float64)
-    D1MACH2 = floatmax(Float64)
-    D1MACH3 = eps(Float64)/2
-    D1MACH4 = eps(Float64)
-    D1MACH5 = log10(2.)
-
     ERRTOL = (4.0*D1MACH3)^(1.0/6.0)
     LOLIM  = 5.0 * D1MACH1
     UPLIM  = D1MACH2/5.0
